@@ -45,7 +45,7 @@ func (s Sender) Send(to, body string) error {
 	urlStr := "https://api.twilio.com/2010-04-01/Accounts/" + s.accountSID + "/Messages.json"
 
 	msgData := url.Values{}
-	msgData.Set("To", "+15412311514")
+	msgData.Set("To", to)
 	msgData.Set("From", s.fromNumber)
 	msgData.Set("Body", body)
 
@@ -144,6 +144,7 @@ type Server struct {
 
 func (s *Server) ListenAndServe(addr string) error {
 	s.server.Addr = addr
+	log.Printf("[Server] starting HTTP server on %s", addr)
 	return s.server.ListenAndServe()
 }
 
@@ -258,12 +259,22 @@ func (s *Server) GetFile(name string, useCompiled bool) func(w http.ResponseWrit
 	}
 }
 
+type GetHealthResponse struct {
+	OK bool `json:"ok"`
+}
+
+func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[Server] checking health")
+	w.Write(Dump(GetHealthResponse{true}))
+}
+
 func NewServer(managers storage.Managers, development bool) *Server {
 	server := &Server{
 		managers: managers,
 	}
 
 	r := mux.NewRouter()
+	r.HandleFunc("/api/health", server.GetHealth)
 	r.HandleFunc("/api/subscribe", server.PostSubscribe)
 
 	// The only static assets taht we have will be loaded out of memory in production.
