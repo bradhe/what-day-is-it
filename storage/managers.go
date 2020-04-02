@@ -10,7 +10,10 @@ type PhoneNumberManager interface {
 	GetNBySendDeadline(int, *time.Time) ([]models.PhoneNumber, error)
 	UpdateSent(*models.PhoneNumber, *time.Time) error
 	UpdateSkipped(*models.PhoneNumber, *time.Time) error
-	Save(models.PhoneNumber) error
+	UpdateNotSendable(*models.PhoneNumber) error
+	UpdateSendable(*models.PhoneNumber) error
+	Create(models.PhoneNumber) error
+	Get(string) (models.PhoneNumber, error)
 }
 
 type Managers interface {

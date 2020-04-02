@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/bradhe/what-day-is-it/models"
 )
@@ -75,7 +76,7 @@ func getBoolAttribute(b bool) *dynamodb.AttributeValue {
 }
 
 func deserializePhoneNumber(attrs map[string]*dynamodb.AttributeValue) (num models.PhoneNumber) {
-	num.Number = getString("number", attrs)
+	num.Number = getString("phone_number", attrs)
 	num.Timezone = getString("timezone", attrs)
 	num.LastSentAt = getTime("last_sent_at", attrs)
 	num.IsSendable = getBool("is_sendable", attrs)
@@ -83,7 +84,7 @@ func deserializePhoneNumber(attrs map[string]*dynamodb.AttributeValue) (num mode
 	return
 }
 
-func deseralizeAllPhoneNumbers(arr []map[string]*dynamodb.AttributeValue) (out []models.PhoneNumber) {
+func deserializeAllPhoneNumbers(arr []map[string]*dynamodb.AttributeValue) (out []models.PhoneNumber) {
 	for _, attrs := range arr {
 		out = append(out, deserializePhoneNumber(attrs))
 	}
@@ -110,7 +111,24 @@ func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Tim
 		log.Printf("ERR failed to scan for %d phone numbers in DynamoDB: %s", n, err.Error())
 		return nil, err
 	} else {
-		return deseralizeAllPhoneNumbers(out.Items), nil
+		return deserializeAllPhoneNumbers(out.Items), nil
+	}
+}
+
+func (m dynamodbPhoneNumberManager) Get(num string) (models.PhoneNumber, error) {
+	in := dynamodb.GetItemInput{
+		TableName: aws.String(m.tableName()),
+		Key: map[string]*dynamodb.AttributeValue{
+			"phone_number": getStringAttribute(num),
+		},
+		ConsistentRead: aws.Bool(true),
+	}
+
+	if out, err := m.svc.GetItem(&in); err != nil {
+		log.Printf("ERR failed to get phone number in DynamoDB: %s", err.Error())
+		return models.PhoneNumber{}, err
+	} else {
+		return deserializePhoneNumber(out.Item), nil
 	}
 }
 
@@ -125,7 +143,7 @@ func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *
 
 	in := dynamodb.UpdateItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			"number": getStringAttribute(num.Number),
+			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
@@ -150,12 +168,62 @@ func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *
 	return nil
 }
 
+func (m dynamodbPhoneNumberManager) UpdateNotSendable(num *models.PhoneNumber) error {
+	in := dynamodb.UpdateItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"phone_number": getStringAttribute(num.Number),
+		},
+		TableName: aws.String(m.tableName()),
+		ExpressionAttributeNames: map[string]*string{
+			"#is_sendable": aws.String("is_sendable"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":is_sendable": getBoolAttribute(false),
+		},
+		UpdateExpression: aws.String("SET #is_sendable = :is_sendable"),
+	}
+
+	if _, err := m.svc.UpdateItem(&in); err != nil {
+		log.Printf("ERR failed to updating not sendable number in DynamoDB: %s", err.Error())
+		return err
+	} else {
+		num.IsSendable = false
+	}
+
+	return nil
+}
+
+func (m dynamodbPhoneNumberManager) UpdateSendable(num *models.PhoneNumber) error {
+	in := dynamodb.UpdateItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"phone_number": getStringAttribute(num.Number),
+		},
+		TableName: aws.String(m.tableName()),
+		ExpressionAttributeNames: map[string]*string{
+			"#is_sendable": aws.String("is_sendable"),
+		},
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":is_sendable": getBoolAttribute(true),
+		},
+		UpdateExpression: aws.String("SET #is_sendable = :is_sendable"),
+	}
+
+	if _, err := m.svc.UpdateItem(&in); err != nil {
+		log.Printf("ERR failed to updating sendable number in DynamoDB: %s", err.Error())
+		return err
+	} else {
+		num.IsSendable = false
+	}
+
+	return nil
+}
+
 func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentAt *time.Time) error {
 	newDeadline := nextDeadline(sentAt)
 
 	in := dynamodb.UpdateItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
-			"number": getStringAttribute(num.Number),
+			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
@@ -179,7 +247,7 @@ func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentA
 
 func serializePhoneNumber(num models.PhoneNumber) map[string]*dynamodb.AttributeValue {
 	return map[string]*dynamodb.AttributeValue{
-		"number":        getStringAttribute(num.Number),
+		"phone_number":  getStringAttribute(num.Number),
 		"timezone":      getStringAttribute(num.Timezone),
 		"last_sent_at":  getTimeAttribute(num.LastSentAt),
 		"is_sendable":   getBoolAttribute(num.IsSendable),
@@ -187,19 +255,27 @@ func serializePhoneNumber(num models.PhoneNumber) map[string]*dynamodb.Attribute
 	}
 }
 
-func (m dynamodbPhoneNumberManager) Save(num models.PhoneNumber) error {
-	t := time.Now()
-	num.LastSentAt = &t
-	num.SendDeadline = nextDeadline(&t)
-
+func (m dynamodbPhoneNumberManager) Create(num models.PhoneNumber) error {
 	in := dynamodb.PutItemInput{
-		TableName: aws.String(m.tableName()),
-		Item:      serializePhoneNumber(num),
+		TableName:           aws.String(m.tableName()),
+		Item:                serializePhoneNumber(num),
+		ConditionExpression: aws.String("attribute_not_exists(phone_number)"),
 	}
 
 	if _, err := m.svc.PutItem(&in); err != nil {
-		log.Printf("ERR failed to put phone numbers in DynamoDB: %s", err.Error())
-		return err
+		// Let's see if we can figure out what type of error this is.
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "ConditionalCheckFailedException":
+				log.Printf("ERR phone number already subscribed")
+				return ErrRecordExists
+			}
+
+			return err
+		} else {
+			log.Printf("ERR failed to put phone numbers in DynamoDB: %s", err.Error())
+			return err
+		}
 	}
 
 	return nil

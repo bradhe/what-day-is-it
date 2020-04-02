@@ -16,10 +16,10 @@ Resources:
     Properties:
       TableName: !Sub "${AWS::StackName}-PhoneNumbers"
       AttributeDefinitions:
-        - AttributeName: number
+        - AttributeName: phone_number
           AttributeType: S
       KeySchema:
-        - AttributeName: number
+        - AttributeName: phone_number
           KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: 3

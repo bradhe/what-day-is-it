@@ -17,7 +17,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const DefaultTimeZone = "Pacific/Los_Angeles"
+const DefaultTimeZone = "America/Los_Angeles"
 
 type Sender struct {
 	accountSID string
@@ -140,6 +140,7 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 type Server struct {
 	managers storage.Managers
 	server   *http.Server
+	sender   *Sender
 }
 
 func (s *Server) ListenAndServe(addr string) error {
@@ -188,7 +189,65 @@ func Dump(obj interface{}) []byte {
 	}
 }
 
+type IncomingMessageRequest struct {
+	AccountSID string `json:"account_sid"`
+	From       string `json:"from"`
+	Body       string `json:"body"`
+}
+
+func getTwiMLSMS(message string) []byte {
+	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>%s</Body></Message></Response>`, message))
+}
+
+func isStopMessage(str string) bool {
+	return strings.ToLower(strings.TrimSpace(str)) == "stop"
+}
+
+func (s *Server) PostIncomingMessage(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	log.Printf("[Server] processing unsubscribe request from Twilio")
+
+	var req IncomingMessageRequest
+
+	buf, _ := ioutil.ReadAll(r.Body)
+
+	if vals, err := url.ParseQuery(string(buf)); err != nil {
+		log.Printf("[Server] ERR failed to decode Twilio webhook request. %s", err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		req.From = vals.Get("From")
+		req.Body = vals.Get("Body")
+		req.AccountSID = vals.Get("AccountSid")
+	}
+
+	if isStopMessage(req.Body) {
+		if phoneNumber, err := s.managers.PhoneNumbers().Get(req.From); err != nil {
+			log.Printf("[Server] ERR to find phone number associated with Twilio webhook request. %s", err.Error())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		} else {
+			// We update this record to mark it as not sendable.
+			if err := s.managers.PhoneNumbers().UpdateNotSendable(&phoneNumber); err != nil {
+				log.Printf("[Server] ERR failed to update record as not sendable. %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// We can reply to the user now that they've been dropped.
+		log.Printf("[Server] user unsubscribed")
+		w.Write(getTwiMLSMS(`Okay, I'll stop reminding you starting...NOW!`))
+	} else {
+		log.Printf("[Server] not sure what user wants: `%s`", req.Body)
+		w.Write(getTwiMLSMS(`You do know you're talking to a robot right?`))
+	}
+}
+
 func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
 	var req PostSubscribeRequest
 	var resp PostSubscribeResponse
 
@@ -222,17 +281,32 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 			IsSendable: true,
 		}
 
-		if err := s.managers.PhoneNumbers().Save(phoneNumber); err != nil {
-			log.Printf("[Server] ERR failed to save phone number: %s", err.Error())
-			w.WriteHeader(http.StatusInternalServerError)
+		if err := s.managers.PhoneNumbers().Create(phoneNumber); err != nil {
+			if err == storage.ErrRecordExists {
+				// TODO: They resubscribed so we should update their record I guess.
 
-			resp.Subscribed = false
-			resp.Error = "An internal error occured."
+				resp.Number = num
+				resp.Timezone = phoneNumber.Timezone
+				resp.Subscribed = true
+				resp.Error = ""
 
-			w.Write(Dump(resp))
+				w.Write(Dump(resp))
+			} else {
+				log.Printf("[Server] ERR failed to save phone number: %s", err.Error())
+				w.WriteHeader(http.StatusInternalServerError)
 
-			return
+				resp.Subscribed = false
+				resp.Error = "An internal error occured."
+
+				w.Write(Dump(resp))
+			}
 		} else {
+			s.sender.Send(num, "Yo! Okay, every morning I'll text you what day it is. Just say STOP to make me stop.")
+			s.sender.Send(num, fmt.Sprintf("Today is %s by the way.", GetDayInZone(MustLoadLocation(phoneNumber.Timezone))))
+
+			// We'll update this record so we don't send something again later...
+			s.managers.PhoneNumbers().UpdateSent(&phoneNumber, clock())
+
 			resp.Number = num
 			resp.Timezone = phoneNumber.Timezone
 			resp.Subscribed = true
@@ -268,14 +342,16 @@ func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write(Dump(GetHealthResponse{true}))
 }
 
-func NewServer(managers storage.Managers, development bool) *Server {
+func NewServer(managers storage.Managers, sender *Sender, development bool) *Server {
 	server := &Server{
 		managers: managers,
+		sender:   sender,
 	}
 
 	r := mux.NewRouter()
 	r.HandleFunc("/api/health", server.GetHealth)
 	r.HandleFunc("/api/subscribe", server.PostSubscribe)
+	r.HandleFunc("/api/incoming-message", server.PostIncomingMessage)
 
 	// The only static assets taht we have will be loaded out of memory in production.
 	r.HandleFunc("/index.html", server.GetFile("index.html", !development))
@@ -307,7 +383,7 @@ func main() {
 	// Start the delivery loop off right!
 	go doSendMessages(managers, &sender)
 
-	if err := NewServer(managers, *development).ListenAndServe(*addr); err != nil {
+	if err := NewServer(managers, &sender, *development).ListenAndServe(*addr); err != nil {
 		panic(err)
 	}
 }

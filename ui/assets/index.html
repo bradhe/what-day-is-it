@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title></title>
+        <title>What day is today?</title>
 
         <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/16.0.11/js/intlTelInput.min.js"></script>
@@ -38,6 +38,11 @@ body {
 }
 
 h1 {
+    color: #EAF8BF;
+    font-size: 48pt;
+}
+
+h2 {
     color: #ECA400;
 }
 
@@ -157,8 +162,11 @@ input.number:focus {
 
     <body>
         <div class="container">
+            <div id="current-day">
+                <h1 id="current-day-label"></h1>
+            </div>
             <div id="explanation">
-                <h1>I can remind you what day it is.</h1>
+                <h2>I can automatically remind you what day it is.</h2>
                 <p class="subtle">Just give me your phone number and I'll text you every morning.</p>
             </div>
 
@@ -718,6 +726,26 @@ input.number:focus {
     </body>
 
     <script>
+function dayNameFromDayIndex(idx) {
+    switch (idx) {
+        case 0:
+            return "Sunday";
+        case 1:
+            return "Monday";
+        case 2:
+            return "Tuesday";
+        case 3:
+            return "Wednesday";
+        case 4:
+            return "Thursday";
+        case 5:
+            return "Friday";
+        case 6:
+            return "Saturday";
+    }
+}
+document.getElementById('current-day-label').innerHTML = 'Today is ' + dayNameFromDayIndex(new Date().getDay());
+
 var number;
 
 window.onload = function() {
