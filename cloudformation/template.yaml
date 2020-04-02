@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Cloudformation template for deploying the resources for what-day-is-itvi  service.
+Parameters:
+  Environment:
+    Description: The environment for this stack.
+    Type: String
+    Default: "development"
+
+Resources:
+
+  #
+  # DyanmoDB Tables
+  #
+  PhoneNumbersTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: !Sub "${AWS::StackName}-PhoneNumbers"
+      AttributeDefinitions:
+        - AttributeName: number
+          AttributeType: S
+      KeySchema:
+        - AttributeName: number
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 3
+        WriteCapacityUnits: 3
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+  #
+  # Access controls
+  #
+  Policy:
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties:
+      Description: Allows access to the various resources for this service.
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:Scan"
+            Resource:
+              - !GetAtt PhoneNumbersTable.Arn

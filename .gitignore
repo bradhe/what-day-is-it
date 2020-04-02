@@ -1,0 +1,9 @@
+# 
+# Development assets
+#
+*.sw[onp]
+
+#
+# Build assets
+#
+/what-day-is-it
