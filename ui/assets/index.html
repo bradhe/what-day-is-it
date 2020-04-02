@@ -79,7 +79,7 @@ input.number:focus {
  .circle-loader {
   margin-bottom: 3.5em;
   border: 1px solid rgba(0, 0, 0, 0.2);
-  border-left-color: #5cb85c;
+  border-left-color: #2D936C;
   animation: loader-spin 1.2s infinite linear;
   position: relative;
   display: inline-block;
@@ -92,7 +92,7 @@ input.number:focus {
 .load-complete {
   -webkit-animation: none;
   animation: none;
-  border-color: #5cb85c;
+  border-color: #2D936C;
   transition: border 500ms ease-out;
 }
 
@@ -110,8 +110,8 @@ input.number:focus {
   height: 3.5em;
   width: 1.75em;
   transform-origin: left top;
-  border-right: 3px solid #5cb85c;
-  border-top: 3px solid #5cb85c;
+  border-right: 3px solid #2D936C;
+  border-top: 3px solid #2D936C;
   content: "";
   left: 1.75em;
   top: 3.5em;
@@ -148,17 +148,21 @@ input.number:focus {
     opacity: 1;
   }
 }
+
+.hidden {
+    display: none;
+}
         </style>
     </head>
 
     <body>
         <div class="container">
-            <div class="explanation">
+            <div id="explanation">
                 <h1>I can remind you what day it is.</h1>
                 <p class="subtle">Just give me your phone number and I'll text you every morning.</p>
             </div>
 
-            <div class="subscribe-form">
+            <div id="subscribe-form">
                 <form id="subscription">
                     <div class="form-element number">
                         <input type="tel" name="number" placeholder="Your phone number." id="number" class="number" />
@@ -704,6 +708,12 @@ input.number:focus {
                     </div>
                 </form>
             </div>
+
+            <div class="hidden" id="progress-indicator">
+                <div class="circle-loader">
+                    <div class="checkmark draw"></div>
+                </div>
+            </div>
         </div>
     </body>
 
@@ -714,12 +724,14 @@ window.onload = function() {
     const numberInput = document.getElementById('number');
     number = intlTelInput(numberInput, {
         placeholderNumberType: 'MOBILE',
-        utilsScript: 'https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.7.49/libphonenumber-js.min.js',
     });
 }
 
 
 $('#subscription').on('submit', function() {
+    $('#subscribe-form').addClass('hidden');
+    $('#progress-indicator').removeClass('hidden');
+
     const timezone = $('#timezone').val();
 
     const payload = {
@@ -733,9 +745,11 @@ $('#subscription').on('submit', function() {
         contentType: 'application/json',
         data: JSON.stringify(payload)
     }).done(function(data) {
-        console.log('success', data);
+        $('.circle-loader').addClass('load-complete');
+        $('.checkmark').show();
     }).fail(function(data) {
-        console.log('error', data);
+        $('#subscribe-form').removeClass('hidden');
+        $('#progress-indicator').addClass('hidden');
     });
 
     return false;
