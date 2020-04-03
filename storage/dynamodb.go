@@ -132,14 +132,14 @@ func (m dynamodbPhoneNumberManager) Get(num string) (models.PhoneNumber, error) 
 	}
 }
 
-func nextDeadline(sentAt *time.Time) *time.Time {
-	nextDay := sentAt.Add(24 * time.Hour)
+func nextDeadline(sentAt *time.Time, loc *time.Location) *time.Time {
+	nextDay := sentAt.In(loc).Add(24 * time.Hour)
 	deadline := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 8, 0, 0, 0, nextDay.Location())
 	return &deadline
 }
 
 func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *time.Time) error {
-	newDeadline := nextDeadline(sentAt)
+	newDeadline := nextDeadline(sentAt, MustLoadLocation(num.Timezone))
 
 	in := dynamodb.UpdateItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
@@ -219,7 +219,7 @@ func (m dynamodbPhoneNumberManager) UpdateSendable(num *models.PhoneNumber) erro
 }
 
 func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentAt *time.Time) error {
-	newDeadline := nextDeadline(sentAt)
+	newDeadline := nextDeadline(sentAt, MustLoadLocation(num.Timezone))
 
 	in := dynamodb.UpdateItemInput{
 		Key: map[string]*dynamodb.AttributeValue{
@@ -243,6 +243,11 @@ func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentA
 	}
 
 	return nil
+}
+
+func MustLoadLocation(str string) *time.Location {
+	loc, _ := time.LoadLocation(str)
+	return loc
 }
 
 func serializePhoneNumber(num models.PhoneNumber) map[string]*dynamodb.AttributeValue {
