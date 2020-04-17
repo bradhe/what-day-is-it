@@ -84,7 +84,7 @@ func (s Sender) Send(to, body string) error {
 }
 
 func MustLoadLocation(name string) *time.Location {
-	if loc, err := time.LoadLocation("UTC"); err != nil {
+	if loc, err := time.LoadLocation(name); err != nil {
 		panic(err)
 	} else {
 		return loc
