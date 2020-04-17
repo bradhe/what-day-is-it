@@ -2,15 +2,17 @@ package storage
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/bradhe/what-day-is-it/pkg/logs"
 	"github.com/bradhe/what-day-is-it/pkg/models"
 )
+
+var logger = logs.WithPackage("storage")
 
 type dynamodbPhoneNumberManager struct {
 	tablePrefix string
@@ -108,7 +110,7 @@ func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Tim
 	}
 
 	if out, err := m.svc.Scan(&in); err != nil {
-		log.Printf("ERR failed to scan for %d phone numbers in DynamoDB: %s", n, err.Error())
+		logger.WithError(err).Errorf("failed to scan for %d phone numbers in DynamoDB", n)
 		return nil, err
 	} else {
 		return deserializeAllPhoneNumbers(out.Items), nil
@@ -125,7 +127,7 @@ func (m dynamodbPhoneNumberManager) Get(num string) (models.PhoneNumber, error) 
 	}
 
 	if out, err := m.svc.GetItem(&in); err != nil {
-		log.Printf("ERR failed to get phone number in DynamoDB: %s", err.Error())
+		logger.WithError(err).Errorf("failed to get phone number in DynamoDB")
 		return models.PhoneNumber{}, err
 	} else {
 		return deserializePhoneNumber(out.Item), nil
@@ -161,7 +163,7 @@ func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *
 	}
 
 	if _, err := m.svc.UpdateItem(&in); err != nil {
-		log.Printf("ERR failed to updating sent phone number in DynamoDB: %s", err.Error())
+		logger.WithError(err).Errorf("failed to update sent phone number in DynamoDB")
 		return err
 	} else {
 		num.LastSentAt = sentAt
@@ -187,7 +189,7 @@ func (m dynamodbPhoneNumberManager) UpdateNotSendable(num *models.PhoneNumber) e
 	}
 
 	if _, err := m.svc.UpdateItem(&in); err != nil {
-		log.Printf("ERR failed to updating not sendable number in DynamoDB: %s", err.Error())
+		logger.WithError(err).Errorf("failed to update not sendable phone number in DynamoDB")
 		return err
 	} else {
 		num.IsSendable = false
@@ -212,7 +214,7 @@ func (m dynamodbPhoneNumberManager) UpdateSendable(num *models.PhoneNumber) erro
 	}
 
 	if _, err := m.svc.UpdateItem(&in); err != nil {
-		log.Printf("ERR failed to updating sendable number in DynamoDB: %s", err.Error())
+		logger.WithError(err).Errorf("failed to update sendable phone number in DynamoDB")
 		return err
 	} else {
 		num.IsSendable = false
@@ -239,7 +241,7 @@ func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentA
 	}
 
 	if _, err := m.svc.UpdateItem(&in); err != nil {
-		log.Printf("ERR failed to updating skipped phone number in DynamoDB: %s", err.Error())
+		logger.WithError(err).Errorf("failed to update skipped phone number in DynamoDB")
 		return err
 	} else {
 		num.SendDeadline = newDeadline
@@ -275,13 +277,13 @@ func (m dynamodbPhoneNumberManager) Create(num models.PhoneNumber) error {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case "ConditionalCheckFailedException":
-				log.Printf("ERR phone number already subscribed")
+				logger.Warn("phone number alreaday subscribed")
 				return ErrRecordExists
 			}
 
 			return err
 		} else {
-			log.Printf("ERR failed to put phone numbers in DynamoDB: %s", err.Error())
+			logger.WithError(err).Error("failed to put phone number in DynamoDB")
 			return err
 		}
 	}
