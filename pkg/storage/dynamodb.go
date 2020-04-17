@@ -134,7 +134,10 @@ func (m dynamodbPhoneNumberManager) Get(num string) (models.PhoneNumber, error) 
 
 func nextDeadline(sentAt *time.Time, loc *time.Location) *time.Time {
 	nextDay := sentAt.In(loc).Add(24 * time.Hour)
+
+	// this is a funny way of thunking the date to 8am in that location.
 	deadline := time.Date(nextDay.Year(), nextDay.Month(), nextDay.Day(), 8, 0, 0, 0, nextDay.Location())
+
 	return &deadline
 }
 
