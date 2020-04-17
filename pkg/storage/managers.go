@@ -3,7 +3,7 @@ package storage
 import (
 	"time"
 
-	"github.com/bradhe/what-day-is-it/models"
+	"github.com/bradhe/what-day-is-it/pkg/models"
 )
 
 type PhoneNumberManager interface {

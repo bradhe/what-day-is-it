@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bradhe/what-day-is-it/models"
-	"github.com/bradhe/what-day-is-it/storage"
-	"github.com/bradhe/what-day-is-it/ui"
+	"github.com/bradhe/what-day-is-it/pkg/models"
+	"github.com/bradhe/what-day-is-it/pkg/storage"
+	"github.com/bradhe/what-day-is-it/pkg/ui"
 	"github.com/gorilla/mux"
 )
 

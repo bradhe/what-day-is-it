@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/bradhe/what-day-is-it/models"
+	"github.com/bradhe/what-day-is-it/pkg/models"
 )
 
 type dynamodbPhoneNumberManager struct {
