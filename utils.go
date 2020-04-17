@@ -1,9 +1,17 @@
 package main
 
-import "regexp"
+import (
+	"regexp"
+	"time"
+)
 
 var phoneexp = regexp.MustCompile(`[^\+0-9]`)
 var validexp = regexp.MustCompile(`\+[0-9]{11,13}`)
+
+func clock() *time.Time {
+	t := time.Now()
+	return &t
+}
 
 func CleanPhoneNumber(number string) string {
 	if len(number) < 1 {
@@ -35,4 +43,16 @@ func IsCleanPhoneNumber(number string) bool {
 	}
 
 	return validexp.MatchString(number)
+}
+
+func MustLoadLocation(name string) *time.Location {
+	if loc, err := time.LoadLocation(name); err != nil {
+		panic(err)
+	} else {
+		return loc
+	}
+}
+
+func GetDayInZone(loc *time.Location) string {
+	return Clock().In(loc).Format("Monday")
 }

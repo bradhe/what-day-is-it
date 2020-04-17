@@ -19,6 +19,10 @@ import (
 
 const DefaultTimeZone = "America/Los_Angeles"
 
+type ClockFunc func() *time.Time
+
+var Clock ClockFunc = clock
+
 type Sender struct {
 	accountSID string
 	authToken  string
@@ -35,10 +39,6 @@ func NewSender(accountSID, authToken, fromNumber string) Sender {
 
 type twilioResponse struct {
 	SID string `json:"sid"`
-}
-
-func GetDayInZone(loc *time.Location) string {
-	return time.Now().In(loc).Format("Monday")
 }
 
 func (s Sender) Send(to, body string) error {
@@ -83,19 +83,6 @@ func (s Sender) Send(to, body string) error {
 	return nil
 }
 
-func MustLoadLocation(name string) *time.Location {
-	if loc, err := time.LoadLocation(name); err != nil {
-		panic(err)
-	} else {
-		return loc
-	}
-}
-
-func clock() *time.Time {
-	t := time.Now()
-	return &t
-}
-
 func doSendMessages(managers storage.Managers, sender *Sender) {
 	manager := managers.PhoneNumbers()
 
@@ -103,7 +90,7 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 		log.Printf("Starting delivery run.")
 
 		for {
-			numbers, err := manager.GetNBySendDeadline(10, clock())
+			numbers, err := manager.GetNBySendDeadline(10, Clock())
 
 			if err != nil {
 				log.Printf("ERR failed to lookup batch for delivery: %s", err.Error())
