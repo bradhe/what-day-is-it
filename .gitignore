@@ -2,6 +2,7 @@
 # Development assets
 #
 *.sw[onp]
+*.code-workspace
 
 #
 # Build assets
