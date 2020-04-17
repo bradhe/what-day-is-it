@@ -5,17 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/bradhe/stopwatch"
+	"github.com/bradhe/what-day-is-it/pkg/logs"
 	"github.com/bradhe/what-day-is-it/pkg/models"
 	"github.com/bradhe/what-day-is-it/pkg/storage"
 	"github.com/bradhe/what-day-is-it/pkg/ui"
 	"github.com/gorilla/mux"
 )
+
+var logger = logs.WithPackage("main")
 
 const DefaultTimeZone = "America/Los_Angeles"
 
@@ -59,7 +62,7 @@ func (s Sender) Send(to, body string) error {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		log.Printf("ERR failed to send request to Twilio: %s", err.Error())
+		logger.WithError(err).Error("failed to send request to Twilio")
 		return err
 	}
 
@@ -69,15 +72,12 @@ func (s Sender) Send(to, body string) error {
 		var data twilioResponse
 
 		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			log.Printf("ERR failed to parse Twilio response: %s", err.Error())
+			logger.WithError(err).Error("failed to parse Twilio response")
 		} else {
-			log.Printf("message `%s` delivered", data.SID)
+			logger.Infof("message `%s` delivered", data.SID)
 		}
 	} else {
-		log.Printf("ERR Twilio response code: `%s`", resp.Status)
-
-		buf, _ := ioutil.ReadAll(resp.Body)
-		log.Printf("ERR body: `%s`", string(buf))
+		logger.Errorf("invalid twilio response code: %s", resp.Status)
 	}
 
 	return nil
@@ -87,13 +87,13 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 	manager := managers.PhoneNumbers()
 
 	for range time.Tick(15 * time.Minute) {
-		log.Printf("Starting delivery run.")
+		logger.Info("starting delivery run")
 
 		for {
 			numbers, err := manager.GetNBySendDeadline(10, Clock())
 
 			if err != nil {
-				log.Printf("ERR failed to lookup batch for delivery: %s", err.Error())
+				logger.WithError(err).Error("failed to lookup batch for delivery")
 				break
 			}
 
@@ -103,7 +103,7 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 
 			for _, number := range numbers {
 				if !number.IsSendable {
-					log.Printf("skipping unsendable number")
+					logger.Debug("skipping unsendable number")
 
 					// Update this anyway so we don't check it again for a while.
 					manager.UpdateSkipped(&number, clock())
@@ -114,7 +114,7 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 				body := fmt.Sprintf("Today is %s", GetDayInZone(MustLoadLocation(number.Timezone)))
 
 				if err := sender.Send(number.Number, body); err != nil {
-					log.Printf("WARN failed to deliver message: %s", err.Error())
+					logger.WithError(err).Warn("failed to deliver message via Twilio")
 				}
 
 				// We'll finish this for the day.
@@ -132,7 +132,7 @@ type Server struct {
 
 func (s *Server) ListenAndServe(addr string) error {
 	s.server.Addr = addr
-	log.Printf("[Server] starting HTTP server on %s", addr)
+	logger.Infof("starting HTTP server on %s", addr)
 	return s.server.ListenAndServe()
 }
 
@@ -161,7 +161,7 @@ func timezoneOrDefault(str string) string {
 
 	// Let's try to load this timezone. If it fails we'll just use the default timezone.
 	if _, err := time.LoadLocation(str); err != nil {
-		log.Printf("failed to load timezone `%s` so using default `%s` instead", str, DefaultTimeZone)
+		logger.WithField("requested_timezone", str).WithField("default_timezone", DefaultTimeZone).Info("railed to load timezone")
 		return DefaultTimeZone
 	} else {
 		return str
@@ -193,14 +193,14 @@ func isStopMessage(str string) bool {
 func (s *Server) PostIncomingMessage(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	log.Printf("[Server] processing unsubscribe request from Twilio")
+	logger.Infof("processing Twilio webhook")
 
 	var req IncomingMessageRequest
 
 	buf, _ := ioutil.ReadAll(r.Body)
 
 	if vals, err := url.ParseQuery(string(buf)); err != nil {
-		log.Printf("[Server] ERR failed to decode Twilio webhook request. %s", err.Error())
+		logger.WithError(err).Error("failed to decode Twilio webhook request")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	} else {
@@ -211,23 +211,23 @@ func (s *Server) PostIncomingMessage(w http.ResponseWriter, r *http.Request) {
 
 	if isStopMessage(req.Body) {
 		if phoneNumber, err := s.managers.PhoneNumbers().Get(req.From); err != nil {
-			log.Printf("[Server] ERR to find phone number associated with Twilio webhook request. %s", err.Error())
+			logger.WithError(err).Error("failed to find phone number associated with Twilio webhook request")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		} else {
 			// We update this record to mark it as not sendable.
 			if err := s.managers.PhoneNumbers().UpdateNotSendable(&phoneNumber); err != nil {
-				log.Printf("[Server] ERR failed to update record as not sendable. %s", err.Error())
+				logger.WithError(err).Error("failed to update record as not sendable")
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
 		}
 
 		// We can reply to the user now that they've been dropped.
-		log.Printf("[Server] user unsubscribed")
+		logger.Info("user unsubscribed")
 		w.Write(getTwiMLSMS(`Okay, I'll stop reminding you starting...NOW!`))
 	} else {
-		log.Printf("[Server] not sure what user wants: `%s`", req.Body)
+		logger.Infof("unknown request from user: `%s`", req.Body)
 		w.Write(getTwiMLSMS(`You do know you're talking to a robot right?`))
 	}
 }
@@ -238,10 +238,10 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 	var req PostSubscribeRequest
 	var resp PostSubscribeResponse
 
-	log.Printf("[Server] handling post")
+	logger.Info("handling subscribe request")
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Printf("[Server] ERR failed to decode body: %s", err.Error())
+		logger.WithError(err).Error("failed to decode request body")
 		w.WriteHeader(http.StatusBadRequest)
 
 		resp.Subscribed = false
@@ -252,7 +252,7 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if num := CleanPhoneNumber(req.Number); !IsCleanPhoneNumber(num) {
-		log.Printf("[Server] ERR invalid phone number")
+		logger.Error("invalid phone number")
 		w.WriteHeader(http.StatusPreconditionFailed)
 
 		resp.Subscribed = false
@@ -279,7 +279,7 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 
 				w.Write(Dump(resp))
 			} else {
-				log.Printf("[Server] ERR failed to save phone number: %s", err.Error())
+				logger.WithError(err).Error("failed to save phone number")
 				w.WriteHeader(http.StatusInternalServerError)
 
 				resp.Subscribed = false
@@ -307,9 +307,9 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 func (s *Server) GetFile(name string, useCompiled bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if useCompiled {
-			w.Write(ui.MustAsset("assets/index.html"))
+			w.Write(ui.MustAsset("assets/" + name))
 		} else {
-			buf, err := ioutil.ReadFile("ui/assets/index.html")
+			buf, err := ioutil.ReadFile("pkg/ui/assets/" + name)
 
 			if err != nil {
 				panic(err)
@@ -325,8 +325,62 @@ type GetHealthResponse struct {
 }
 
 func (s *Server) GetHealth(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[Server] checking health")
+	logger.Info("checking health")
 	w.Write(Dump(GetHealthResponse{true}))
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	StatusCode int
+	Bytes      int64
+}
+
+func (w *loggingResponseWriter) WriteHeader(code int) {
+	w.StatusCode = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *loggingResponseWriter) Write(buf []byte) (int, error) {
+	// this is the implicit status code unless one has been explicitly written.
+	if w.StatusCode == 0 {
+		w.StatusCode = http.StatusOK
+	}
+
+	n, err := w.ResponseWriter.Write(buf)
+	w.Bytes += int64(n)
+	return n, err
+}
+
+func newLoggingResponseWriter(base http.ResponseWriter) *loggingResponseWriter {
+	return &loggingResponseWriter{base, 0, 0}
+}
+
+func bytes(arr ...int64) uint64 {
+	var acc uint64
+
+	for _, b := range arr {
+		if b > 0 {
+			acc += uint64(b)
+		}
+	}
+
+	return acc
+}
+
+func newRouteHandler(r *mux.Router) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		wrapper := newLoggingResponseWriter(w)
+
+		defer stopwatch.Start().Timer(func(watch stopwatch.Watch) {
+			logger.WithFields(map[string]interface{}{
+				"status": wrapper.StatusCode,
+				"bytes":  bytes(wrapper.Bytes, req.ContentLength),
+				"time":   watch,
+			}).Infof("served %s to %s", req.Method, req.RemoteAddr)
+		})
+
+		r.ServeHTTP(wrapper, req)
+	})
 }
 
 func NewServer(managers storage.Managers, sender *Sender, development bool) *Server {
@@ -345,7 +399,7 @@ func NewServer(managers storage.Managers, sender *Sender, development bool) *Ser
 	r.HandleFunc("/", server.GetFile("index.html", !development))
 
 	base := &http.Server{
-		Handler: r,
+		Handler: newRouteHandler(r),
 	}
 
 	server.server = base
