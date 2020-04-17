@@ -1,4 +1,4 @@
-package storage
+package managers
 
 import (
 	"time"
@@ -18,8 +18,4 @@ type PhoneNumberManager interface {
 
 type Managers interface {
 	PhoneNumbers() PhoneNumberManager
-}
-
-func New(tablePrefix string) Managers {
-	return newDynamoDBManagers(tablePrefix)
 }

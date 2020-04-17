@@ -14,6 +14,7 @@ import (
 	"github.com/bradhe/what-day-is-it/pkg/logs"
 	"github.com/bradhe/what-day-is-it/pkg/models"
 	"github.com/bradhe/what-day-is-it/pkg/storage"
+	"github.com/bradhe/what-day-is-it/pkg/storage/managers"
 	"github.com/bradhe/what-day-is-it/pkg/ui"
 	"github.com/gorilla/mux"
 )
@@ -83,7 +84,7 @@ func (s Sender) Send(to, body string) error {
 	return nil
 }
 
-func doSendMessages(managers storage.Managers, sender *Sender) {
+func doSendMessages(managers managers.Managers, sender *Sender) {
 	manager := managers.PhoneNumbers()
 
 	for range time.Tick(15 * time.Minute) {
@@ -125,7 +126,7 @@ func doSendMessages(managers storage.Managers, sender *Sender) {
 }
 
 type Server struct {
-	managers storage.Managers
+	managers managers.Managers
 	server   *http.Server
 	sender   *Sender
 }
@@ -269,7 +270,7 @@ func (s *Server) PostSubscribe(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.managers.PhoneNumbers().Create(phoneNumber); err != nil {
-			if err == storage.ErrRecordExists {
+			if err == managers.ErrRecordExists {
 				// TODO: They resubscribed so we should update their record I guess.
 
 				resp.Number = num
@@ -383,7 +384,7 @@ func newRouteHandler(r *mux.Router) http.Handler {
 	})
 }
 
-func NewServer(managers storage.Managers, sender *Sender, development bool) *Server {
+func NewServer(managers managers.Managers, sender *Sender, development bool) *Server {
 	server := &Server{
 		managers: managers,
 		sender:   sender,

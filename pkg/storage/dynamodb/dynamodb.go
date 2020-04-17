@@ -1,4 +1,4 @@
-package storage
+package dynamodb
 
 import (
 	"fmt"
@@ -7,16 +7,17 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
+	awsdynamodb "github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/bradhe/what-day-is-it/pkg/logs"
 	"github.com/bradhe/what-day-is-it/pkg/models"
+	"github.com/bradhe/what-day-is-it/pkg/storage/managers"
 )
 
 var logger = logs.WithPackage("storage")
 
 type dynamodbPhoneNumberManager struct {
 	tablePrefix string
-	svc         *dynamodb.DynamoDB
+	svc         *awsdynamodb.DynamoDB
 }
 
 func (m dynamodbPhoneNumberManager) tableName() string {
@@ -31,7 +32,7 @@ func formatTime(t *time.Time) string {
 	return fmt.Sprintf("%d", t.UTC().Unix())
 }
 
-func getString(name string, attrs map[string]*dynamodb.AttributeValue) string {
+func getString(name string, attrs map[string]*awsdynamodb.AttributeValue) string {
 	if val, ok := attrs[name]; ok {
 		return aws.StringValue(val.S)
 	}
@@ -39,13 +40,13 @@ func getString(name string, attrs map[string]*dynamodb.AttributeValue) string {
 	return ""
 }
 
-func getStringAttribute(val string) *dynamodb.AttributeValue {
-	var attr dynamodb.AttributeValue
+func getStringAttribute(val string) *awsdynamodb.AttributeValue {
+	var attr awsdynamodb.AttributeValue
 	attr.S = aws.String(val)
 	return &attr
 }
 
-func getTime(name string, attrs map[string]*dynamodb.AttributeValue) *time.Time {
+func getTime(name string, attrs map[string]*awsdynamodb.AttributeValue) *time.Time {
 	if val, ok := attrs[name]; ok {
 		str := aws.StringValue(val.N)
 		i, _ := strconv.ParseInt(str, 10, 64)
@@ -57,13 +58,13 @@ func getTime(name string, attrs map[string]*dynamodb.AttributeValue) *time.Time 
 	return &time.Time{}
 }
 
-func getTimeAttribute(t *time.Time) *dynamodb.AttributeValue {
-	var attr dynamodb.AttributeValue
+func getTimeAttribute(t *time.Time) *awsdynamodb.AttributeValue {
+	var attr awsdynamodb.AttributeValue
 	attr.N = aws.String(formatTime(t))
 	return &attr
 }
 
-func getBool(name string, attrs map[string]*dynamodb.AttributeValue) bool {
+func getBool(name string, attrs map[string]*awsdynamodb.AttributeValue) bool {
 	if val, ok := attrs[name]; ok {
 		return aws.BoolValue(val.BOOL)
 	}
@@ -71,13 +72,13 @@ func getBool(name string, attrs map[string]*dynamodb.AttributeValue) bool {
 	return false
 }
 
-func getBoolAttribute(b bool) *dynamodb.AttributeValue {
-	var attr dynamodb.AttributeValue
+func getBoolAttribute(b bool) *awsdynamodb.AttributeValue {
+	var attr awsdynamodb.AttributeValue
 	attr.BOOL = aws.Bool(b)
 	return &attr
 }
 
-func deserializePhoneNumber(attrs map[string]*dynamodb.AttributeValue) (num models.PhoneNumber) {
+func deserializePhoneNumber(attrs map[string]*awsdynamodb.AttributeValue) (num models.PhoneNumber) {
 	num.Number = getString("phone_number", attrs)
 	num.Timezone = getString("timezone", attrs)
 	num.LastSentAt = getTime("last_sent_at", attrs)
@@ -86,7 +87,7 @@ func deserializePhoneNumber(attrs map[string]*dynamodb.AttributeValue) (num mode
 	return
 }
 
-func deserializeAllPhoneNumbers(arr []map[string]*dynamodb.AttributeValue) (out []models.PhoneNumber) {
+func deserializeAllPhoneNumbers(arr []map[string]*awsdynamodb.AttributeValue) (out []models.PhoneNumber) {
 	for _, attrs := range arr {
 		out = append(out, deserializePhoneNumber(attrs))
 	}
@@ -95,13 +96,13 @@ func deserializeAllPhoneNumbers(arr []map[string]*dynamodb.AttributeValue) (out 
 }
 
 func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Time) ([]models.PhoneNumber, error) {
-	in := dynamodb.ScanInput{
+	in := awsdynamodb.ScanInput{
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
 			"#deadline": aws.String("send_deadline"),
 		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
-			":deadline": &dynamodb.AttributeValue{
+		ExpressionAttributeValues: map[string]*awsdynamodb.AttributeValue{
+			":deadline": &awsdynamodb.AttributeValue{
 				N: aws.String(formatTime(deadline)),
 			},
 		},
@@ -118,9 +119,9 @@ func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Tim
 }
 
 func (m dynamodbPhoneNumberManager) Get(num string) (models.PhoneNumber, error) {
-	in := dynamodb.GetItemInput{
+	in := awsdynamodb.GetItemInput{
 		TableName: aws.String(m.tableName()),
-		Key: map[string]*dynamodb.AttributeValue{
+		Key: map[string]*awsdynamodb.AttributeValue{
 			"phone_number": getStringAttribute(num),
 		},
 		ConsistentRead: aws.Bool(true),
@@ -146,8 +147,8 @@ func nextDeadline(sentAt *time.Time, loc *time.Location) *time.Time {
 func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *time.Time) error {
 	newDeadline := nextDeadline(sentAt, MustLoadLocation(num.Timezone))
 
-	in := dynamodb.UpdateItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
+	in := awsdynamodb.UpdateItemInput{
+		Key: map[string]*awsdynamodb.AttributeValue{
 			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
@@ -155,7 +156,7 @@ func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *
 			"#send_deadline": aws.String("send_deadline"),
 			"#last_sent_at":  aws.String("last_sent_at"),
 		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+		ExpressionAttributeValues: map[string]*awsdynamodb.AttributeValue{
 			":send_deadline": getTimeAttribute(newDeadline),
 			":last_sent_at":  getTimeAttribute(sentAt),
 		},
@@ -174,15 +175,15 @@ func (m dynamodbPhoneNumberManager) UpdateSent(num *models.PhoneNumber, sentAt *
 }
 
 func (m dynamodbPhoneNumberManager) UpdateNotSendable(num *models.PhoneNumber) error {
-	in := dynamodb.UpdateItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
+	in := awsdynamodb.UpdateItemInput{
+		Key: map[string]*awsdynamodb.AttributeValue{
 			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
 			"#is_sendable": aws.String("is_sendable"),
 		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+		ExpressionAttributeValues: map[string]*awsdynamodb.AttributeValue{
 			":is_sendable": getBoolAttribute(false),
 		},
 		UpdateExpression: aws.String("SET #is_sendable = :is_sendable"),
@@ -199,15 +200,15 @@ func (m dynamodbPhoneNumberManager) UpdateNotSendable(num *models.PhoneNumber) e
 }
 
 func (m dynamodbPhoneNumberManager) UpdateSendable(num *models.PhoneNumber) error {
-	in := dynamodb.UpdateItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
+	in := awsdynamodb.UpdateItemInput{
+		Key: map[string]*awsdynamodb.AttributeValue{
 			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
 			"#is_sendable": aws.String("is_sendable"),
 		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+		ExpressionAttributeValues: map[string]*awsdynamodb.AttributeValue{
 			":is_sendable": getBoolAttribute(true),
 		},
 		UpdateExpression: aws.String("SET #is_sendable = :is_sendable"),
@@ -226,15 +227,15 @@ func (m dynamodbPhoneNumberManager) UpdateSendable(num *models.PhoneNumber) erro
 func (m dynamodbPhoneNumberManager) UpdateSkipped(num *models.PhoneNumber, sentAt *time.Time) error {
 	newDeadline := nextDeadline(sentAt, MustLoadLocation(num.Timezone))
 
-	in := dynamodb.UpdateItemInput{
-		Key: map[string]*dynamodb.AttributeValue{
+	in := awsdynamodb.UpdateItemInput{
+		Key: map[string]*awsdynamodb.AttributeValue{
 			"phone_number": getStringAttribute(num.Number),
 		},
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
 			"#send_deadline": aws.String("send_deadline"),
 		},
-		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+		ExpressionAttributeValues: map[string]*awsdynamodb.AttributeValue{
 			":send_deadline": getTimeAttribute(newDeadline),
 		},
 		UpdateExpression: aws.String("SET #send_deadline = :send_deadline"),
@@ -255,8 +256,8 @@ func MustLoadLocation(str string) *time.Location {
 	return loc
 }
 
-func serializePhoneNumber(num models.PhoneNumber) map[string]*dynamodb.AttributeValue {
-	return map[string]*dynamodb.AttributeValue{
+func serializePhoneNumber(num models.PhoneNumber) map[string]*awsdynamodb.AttributeValue {
+	return map[string]*awsdynamodb.AttributeValue{
 		"phone_number":  getStringAttribute(num.Number),
 		"timezone":      getStringAttribute(num.Timezone),
 		"last_sent_at":  getTimeAttribute(num.LastSentAt),
@@ -266,7 +267,7 @@ func serializePhoneNumber(num models.PhoneNumber) map[string]*dynamodb.Attribute
 }
 
 func (m dynamodbPhoneNumberManager) Create(num models.PhoneNumber) error {
-	in := dynamodb.PutItemInput{
+	in := awsdynamodb.PutItemInput{
 		TableName:           aws.String(m.tableName()),
 		Item:                serializePhoneNumber(num),
 		ConditionExpression: aws.String("attribute_not_exists(phone_number)"),
@@ -278,7 +279,7 @@ func (m dynamodbPhoneNumberManager) Create(num models.PhoneNumber) error {
 			switch aerr.Code() {
 			case "ConditionalCheckFailedException":
 				logger.Warn("phone number alreaday subscribed")
-				return ErrRecordExists
+				return managers.ErrRecordExists
 			}
 
 			return err
@@ -293,19 +294,19 @@ func (m dynamodbPhoneNumberManager) Create(num models.PhoneNumber) error {
 
 type dynamodbManagers struct {
 	tablePrefix string
-	svc         *dynamodb.DynamoDB
+	svc         *awsdynamodb.DynamoDB
 }
 
-func (m dynamodbManagers) PhoneNumbers() PhoneNumberManager {
+func (m dynamodbManagers) PhoneNumbers() managers.PhoneNumberManager {
 	return &dynamodbPhoneNumberManager{
 		tablePrefix: m.tablePrefix,
 		svc:         m.svc,
 	}
 }
 
-func newDynamoDBManagers(tablePrefix string) Managers {
+func New(tablePrefix string) managers.Managers {
 	sess := newAWSSession()
-	svc := dynamodb.New(sess)
+	svc := awsdynamodb.New(sess)
 
 	return &dynamodbManagers{
 		tablePrefix: tablePrefix,
