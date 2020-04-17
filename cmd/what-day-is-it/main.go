@@ -15,6 +15,7 @@ import (
 	"github.com/bradhe/what-day-is-it/pkg/models"
 	"github.com/bradhe/what-day-is-it/pkg/storage"
 	"github.com/bradhe/what-day-is-it/pkg/storage/managers"
+	"github.com/bradhe/what-day-is-it/pkg/twilio"
 	"github.com/bradhe/what-day-is-it/pkg/ui"
 	"github.com/gorilla/mux"
 )
@@ -27,64 +28,7 @@ type ClockFunc func() *time.Time
 
 var Clock ClockFunc = clock
 
-type Sender struct {
-	accountSID string
-	authToken  string
-	fromNumber string
-}
-
-func NewSender(accountSID, authToken, fromNumber string) Sender {
-	return Sender{
-		accountSID,
-		authToken,
-		fromNumber,
-	}
-}
-
-type twilioResponse struct {
-	SID string `json:"sid"`
-}
-
-func (s Sender) Send(to, body string) error {
-	urlStr := "https://api.twilio.com/2010-04-01/Accounts/" + s.accountSID + "/Messages.json"
-
-	msgData := url.Values{}
-	msgData.Set("To", to)
-	msgData.Set("From", s.fromNumber)
-	msgData.Set("Body", body)
-
-	client := &http.Client{}
-	req, _ := http.NewRequest("POST", urlStr, strings.NewReader(msgData.Encode()))
-	req.SetBasicAuth(s.accountSID, s.authToken)
-
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := client.Do(req)
-
-	if err != nil {
-		logger.WithError(err).Error("failed to send request to Twilio")
-		return err
-	}
-
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		var data twilioResponse
-
-		if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-			logger.WithError(err).Error("failed to parse Twilio response")
-		} else {
-			logger.Infof("message `%s` delivered", data.SID)
-		}
-	} else {
-		logger.Errorf("invalid twilio response code: %s", resp.Status)
-	}
-
-	return nil
-}
-
-func doSendMessages(managers managers.Managers, sender *Sender) {
+func doSendMessages(managers managers.Managers, sender *twilio.Sender) {
 	manager := managers.PhoneNumbers()
 
 	for range time.Tick(15 * time.Minute) {
@@ -128,7 +72,7 @@ func doSendMessages(managers managers.Managers, sender *Sender) {
 type Server struct {
 	managers managers.Managers
 	server   *http.Server
-	sender   *Sender
+	sender   *twilio.Sender
 }
 
 func (s *Server) ListenAndServe(addr string) error {
@@ -183,10 +127,6 @@ type IncomingMessageRequest struct {
 	Body       string `json:"body"`
 }
 
-func getTwiMLSMS(message string) []byte {
-	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?><Response><Message><Body>%s</Body></Message></Response>`, message))
-}
-
 func isStopMessage(str string) bool {
 	return strings.ToLower(strings.TrimSpace(str)) == "stop"
 }
@@ -226,10 +166,10 @@ func (s *Server) PostIncomingMessage(w http.ResponseWriter, r *http.Request) {
 
 		// We can reply to the user now that they've been dropped.
 		logger.Info("user unsubscribed")
-		w.Write(getTwiMLSMS(`Okay, I'll stop reminding you starting...NOW!`))
+		w.Write(twilio.TwiMLResponse(`Okay, I'll stop reminding you starting...NOW!`))
 	} else {
 		logger.Infof("unknown request from user: `%s`", req.Body)
-		w.Write(getTwiMLSMS(`You do know you're talking to a robot right?`))
+		w.Write(twilio.TwiMLResponse(`You do know you're talking to a robot right?`))
 	}
 }
 
@@ -384,7 +324,7 @@ func newRouteHandler(r *mux.Router) http.Handler {
 	})
 }
 
-func NewServer(managers managers.Managers, sender *Sender, development bool) *Server {
+func NewServer(managers managers.Managers, sender *twilio.Sender, development bool) *Server {
 	server := &Server{
 		managers: managers,
 		sender:   sender,
@@ -419,7 +359,7 @@ func main() {
 
 	flag.Parse()
 
-	sender := NewSender(*twilioAccountSid, *twilioAuthToken, *twilioPhoneNumber)
+	sender := twilio.NewSender(*twilioAccountSid, *twilioAuthToken, *twilioPhoneNumber)
 	managers := storage.New(*cloudformationStack)
 
 	// Start the delivery loop off right!
