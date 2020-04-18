@@ -1,0 +1,226 @@
+@import "intl-tel-input-16.0.11";
+
+html, body, .container {
+    font-family: Montserrat;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: #391463;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex-grow: 2;
+}
+
+footer {
+    flex-shrink: 0;
+    padding: 8px 5px;
+    font-weight: bold;
+    color: #D2ADFC;
+}
+
+footer p {
+    margin: 0;
+    padding: 0;
+}
+
+footer a {
+    color: #9F7AC9;
+}
+
+footer a:hover {
+    color: #D2ADFC;
+}
+
+.container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+h1 {
+    color: #EAF8BF;
+    font-size: 48pt;
+}
+
+h2 {
+    color: #ECA400;
+}
+
+.subtle {
+    color: #EAF8BF;
+}
+
+input.number {
+    font-size: 16pt;
+    border: none;
+    padding: 8px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+input.number:focus {
+    outline: none;
+}
+
+.form-controls button {
+    width: 100%;
+    font-size: 18pt;
+    padding: 5px 18px;
+}
+
+#current-day {
+    margin-bottom: 25px;
+}
+
+#current-day h1 {
+    margin: 0;
+    padding: 0;
+}
+
+.form-element, .form-controls {
+    width: 500px;
+}
+
+.form-element.timezone {
+    display: flex;
+}
+
+.form-element.timezone label {
+    padding-left: 8px;
+}
+
+.form-element.timezone label, .form-element.timezone select {
+    color: #fff;
+    font-size: 12pt;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+select option, select optgroup { color: black; }
+
+.form-element.timezone select {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    padding: 0px 8px;
+}
+
+.form-element.timezone select:focus {
+    outline: none;
+}
+
+.form-elements {
+    background-color: #D2ADFC;
+    border: 1px #D2ADFC solid;
+    border-radius: 8px;
+    margin-bottom: 32px;
+}
+
+.hidden {
+    display: none;
+}
+
+/**
+ * This is some nasty hackery to override the default values from above
+ */
+.iti {
+    display: flex !important;
+    flex-direction: row;
+}
+
+.iti input {
+    flex-grow: 1;
+}
+/**
+ * End awful hackery
+ */
+
+/**
+ * Loader that I lifted from https://codepen.io/scottloway/pen/zqoLyQ
+ */
+ .circle-loader {
+  margin-bottom: 3.5em;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-left-color: #2D936C;
+  animation: loader-spin 1.2s infinite linear;
+  position: relative;
+  display: inline-block;
+  vertical-align: top;
+  border-radius: 50%;
+  width: 7em;
+  height: 7em;
+}
+
+.load-complete {
+  -webkit-animation: none;
+  animation: none;
+  border-color: #2D936C;
+  transition: border 500ms ease-out;
+}
+
+.checkmark {
+  display: none;
+}
+.checkmark.draw:after {
+  animation-duration: 800ms;
+  animation-timing-function: ease;
+  animation-name: checkmark;
+  transform: scaleX(-1) rotate(135deg);
+}
+.checkmark:after {
+  opacity: 1;
+  height: 3.5em;
+  width: 1.75em;
+  transform-origin: left top;
+  border-right: 3px solid #2D936C;
+  border-top: 3px solid #2D936C;
+  content: "";
+  left: 1.75em;
+  top: 3.5em;
+  position: absolute;
+}
+
+@keyframes loader-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    height: 0;
+    width: 0;
+    opacity: 1;
+  }
+  20% {
+    height: 0;
+    width: 1.75em;
+    opacity: 1;
+  }
+  40% {
+    height: 3.5em;
+    width: 1.75em;
+    opacity: 1;
+  }
+  100% {
+    height: 3.5em;
+    width: 1.75em;
+    opacity: 1;
+  }
+}
+/**
+ * End lifted loading spinner
+ */

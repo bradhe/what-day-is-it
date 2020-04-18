@@ -3,9 +3,11 @@
 #
 *.sw[onp]
 *.code-workspace
+/pkg/ui/node_modules
 
 #
 # Build assets
 #
 /what-day-is-it
 /bin
+/pkg/ui/.what-day-is-it.last-build.checksum

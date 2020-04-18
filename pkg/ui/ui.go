@@ -1,0 +1,3 @@
+//go:generate bash ./build.sh
+//go:generate go-bindata -pkg=ui -prefix=build -o=ui.gen.go -ignore=\.swp ./dist/...
+package ui

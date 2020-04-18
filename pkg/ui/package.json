@@ -1,0 +1,36 @@
+{
+  "name": "what-day-is-it-ui",
+  "version": "1.0.0",
+  "description": "The UI for what-day-is-it",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "webpack-dev-server --open --mode development --liveReload",
+    "build": "webpack --mode production"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bradhe/what-day-is-it.git"
+  },
+  "author": "Brad Heller <brad.heller@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/bradhe/what-day-is-it/issues"
+  },
+  "homepage": "https://github.com/bradhe/what-day-is-it#readme",
+  "devDependencies": {
+    "@babel/core": "^7.9.0",
+    "@babel/preset-env": "^7.9.5",
+    "babel-loader": "^8.1.0",
+    "html-loader": "^1.1.0",
+    "html-webpack-plugin": "^4.2.0",
+    "mini-css-extract-plugin": "^0.9.0",
+    "moment": "^2.24.0",
+    "moment-timezone": "^0.5.28",
+    "sass": "^1.26.3",
+    "sass-loader": "^8.0.2",
+    "webpack": "^4.42.1",
+    "webpack-cli": "^3.3.11",
+    "webpack-dev-server": "^3.10.3"
+  }
+}
