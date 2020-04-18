@@ -12,5 +12,8 @@ build: clean
 	go generate ./...
 	go build -o $(BINDIR)/$(TARGET) ./cmd/what-day-is-it
 
+test: clean
+	go test -v ./...
+
 images:
 	docker build -t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) .
