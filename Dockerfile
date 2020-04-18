@@ -1,6 +1,8 @@
-FROM golang:1.13-alpine as builder
+FROM golang:1.13-alpine AS builder
+
 ENV GO111MODULE on
 ENV CGO_ENABLED 0
+
 WORKDIR /go/src/github.com/bradhe/what-day-is-it
 COPY . .
 RUN mkdir -p ./bin
