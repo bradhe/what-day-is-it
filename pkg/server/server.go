@@ -5,6 +5,7 @@ import (
 
 	"github.com/bradhe/what-day-is-it/pkg/storage/managers"
 	"github.com/bradhe/what-day-is-it/pkg/twilio"
+	"github.com/bradhe/what-day-is-it/pkg/ui"
 	"github.com/gorilla/mux"
 )
 
@@ -16,6 +17,9 @@ type Server struct {
 	managers managers.Managers
 	server   *http.Server
 	sender   *twilio.Sender
+
+	apiHandler http.Handler
+	uiHandler  ui.Handler
 }
 
 func (s *Server) ListenAndServe(addr string) error {
@@ -24,7 +28,15 @@ func (s *Server) ListenAndServe(addr string) error {
 	return s.server.ListenAndServe()
 }
 
-func NewServer(managers managers.Managers, sender *twilio.Sender, development bool) *Server {
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if s.uiHandler.IsAssetRequest(r) {
+		s.uiHandler.ServeHTTP(w, r)
+	} else {
+		s.apiHandler.ServeHTTP(w, r)
+	}
+}
+
+func NewServer(managers managers.Managers, sender *twilio.Sender, development bool, assetBasedir string) *Server {
 	server := &Server{
 		DefaultTimeZone: DefaultTimeZone,
 		managers:        managers,
@@ -36,14 +48,16 @@ func NewServer(managers managers.Managers, sender *twilio.Sender, development bo
 	r.HandleFunc("/api/subscribe", server.PostSubscribe)
 	r.HandleFunc("/api/incoming-message", server.PostIncomingMessage)
 
-	// The only static assets taht we have will be loaded out of memory in production.
-	r.HandleFunc("/index.html", server.GetFile("index.html", !development))
-	r.HandleFunc("/", server.GetFile("index.html", !development))
-
 	base := &http.Server{
-		Handler: newRouteHandler(r),
+		Handler: newLoggedHandler(server),
 	}
 
 	server.server = base
+	server.apiHandler = r
+
+	// TODO: Can this be cleaned up?? Maybe should be pushed in to `ui` package.
+	server.uiHandler = ui.NewHandler(development)
+	server.uiHandler.Basedir = assetBasedir
+
 	return server
 }

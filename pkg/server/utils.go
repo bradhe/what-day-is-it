@@ -7,10 +7,9 @@ import (
 	"time"
 
 	"github.com/bradhe/stopwatch"
-	"github.com/gorilla/mux"
 )
 
-func newRouteHandler(r *mux.Router) http.Handler {
+func newLoggedHandler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		wrapper := newLoggingResponseWriter(w)
 
@@ -19,10 +18,10 @@ func newRouteHandler(r *mux.Router) http.Handler {
 				"status": wrapper.StatusCode,
 				"bytes":  bytes(wrapper.Bytes, req.ContentLength),
 				"time":   watch,
-			}).Infof("served %s to %s", req.Method, req.RemoteAddr)
+			}).Infof("served %s %s to %s", req.Method, req.URL.Path, req.RemoteAddr)
 		})
 
-		r.ServeHTTP(wrapper, req)
+		h.ServeHTTP(wrapper, req)
 	})
 }
 

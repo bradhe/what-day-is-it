@@ -58,6 +58,7 @@ func doSendMessages(managers managers.Managers, sender *twilio.Sender) {
 
 func main() {
 	var (
+		assetBaseDir        = flag.String("asset-base-dir", "pkg/ui/dist", "The directory that assets are built in to.")
 		development         = flag.Bool("development", false, "Put the app in development mode. Basically load UI assets from disk instead of memory.")
 		twilioAccountSid    = flag.String("twilio-account-sid", "", "The account SID to authenticate with.")
 		twilioAuthToken     = flag.String("twilio-auth-token", "", "The Twilio authentication token to authenticate with.")
@@ -80,7 +81,7 @@ func main() {
 	// Start the delivery loop off right!
 	go doSendMessages(managers, &sender)
 
-	if err := server.NewServer(managers, &sender, *development).ListenAndServe(*addr); err != nil {
+	if err := server.NewServer(managers, &sender, *development, *assetBaseDir).ListenAndServe(*addr); err != nil {
 		panic(err)
 	}
 }
