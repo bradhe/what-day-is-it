@@ -10,7 +10,7 @@ RUN go build -a -installsuffix cgo -mod vendor -o ./bin/what-day-is-it ./cmd/wha
 
 FROM alpine:latest
 RUN apk update
-RUN apk --no-cache add git gcc bind-dev musl-dev ca-certificates
+RUN apk --no-cache add git gcc bind-dev musl-dev ca-certificates tzdata
 RUN update-ca-certificates
 COPY --from=builder /go/src/github.com/bradhe/what-day-is-it/bin/what-day-is-it /usr/bin/what-day-is-it
 CMD ["what-day-is-it"]
