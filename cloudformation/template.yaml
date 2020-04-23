@@ -93,8 +93,6 @@ Resources:
         - Key: Stack-Type
           Value: what-day-is-it
 
-
-    
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -112,8 +110,6 @@ Resources:
           Value: !Ref Environment
         - Key: Stack-Type
           Value: what-day-is-it
-
-
 
   AutoScalingRole:
     Type: AWS::IAM::Role
