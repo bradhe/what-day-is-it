@@ -1,18 +1,45 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Cloudformation template for deploying the resources for what-day-is-itvi  service.
 Parameters:
+  VPC:
+    Description: The VPC to deploy all this in to. We could conditionally set this up to manage it for us...
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-e8797e8c
+  SubnetA:
+    Description: A subnet to deploy in to.
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-8212a8da
+  SubnetB:
+    Description: A subnet to deploy in to. Hopefully in a different region than SubnetA.
+    Type: AWS::EC2::Subnet::Id
+    Default: subnet-cd15a6e7
   Environment:
     Description: The environment for this stack.
     Type: String
     Default: "development"
+  CertificateID:
+    Description: The certificate to use for HTTPS resolution.
+    Type: String
+    Default: 2baf905f-9ff7-4b45-b330-585877f60161
+  TwilioAccountSID:
+    Description: The SID of your Twilio account
+    Type: String
+  TwilioAuthToken:
+    Description: The authentication token to use when using Twilio.
+    Type: String
+  TwilioPhoneNumber:
+    Description: The Twilio phone number to send messages from.
+    Type: String
+  HostedZoneName:
+    Type: String
+    Default: what-day-is-today.com
 
 Resources:
-
   #
   # DyanmoDB Tables
   #
   PhoneNumbersTable:
-    Type: "AWS::DynamoDB::Table"
+    Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub "${AWS::StackName}-PhoneNumbers"
       AttributeDefinitions:
@@ -33,8 +60,8 @@ Resources:
   #
   # Access controls
   #
-  Policy:
-    Type: "AWS::IAM::ManagedPolicy"
+  TaskPolicy:
+    Type: AWS::IAM::ManagedPolicy
     Properties:
       Description: Allows access to the various resources for this service.
       PolicyDocument:
@@ -47,3 +74,287 @@ Resources:
               - "dynamodb:Scan"
             Resource:
               - !GetAtt PhoneNumbersTable.Arn
+
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-execution-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+
+    
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-task-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - !Ref TaskPolicy
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+
+
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-auto-scaling-role"
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+
+  #
+  # CloudWatch
+  #
+  ServiceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${AWS::StackName}/Service'
+
+  #
+  # EC2
+  #
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    DependsOn:
+      - LoadBalancerSecurityGroup
+    Properties:
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: 60
+      Name: !Sub "${AWS::StackName}-load-balancer"
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Subnets:
+        - !Ref SubnetA
+        - !Ref SubnetB
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: "/api/health"
+      HealthCheckTimeoutSeconds: 5
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Sub "${AWS::StackName}-target-group"
+      Port: 8081
+      Protocol: HTTP
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60 # default is 300
+      TargetType: ip
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+  ListenerHTTPS:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref TargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Sub "arn:aws:acm:${AWS::Region}:${AWS::AccountId}:certificate/${CertificateID}"
+  
+  AutoScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn:
+      - ServiceECSService
+    Properties:
+      MinCapacity: 0
+      MaxCapacity: 1
+      ResourceId: !Sub "service/${AWS::StackName}-cluster/${AWS::StackName}-service"
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !GetAtt AutoScalingRole.Arn
+
+  AutoScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${AWS::StackName}-auto-scaling-policty"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        ScaleInCooldown: 10
+        ScaleOutCooldown: 10
+        TargetValue: 50
+
+  #
+  # ECS
+  #
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${AWS::StackName}-cluster"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+  
+  ServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-service"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 256
+      Memory: 0.5GB
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Sub "${AWS::StackName}-service"
+          Image: "bradhe/what-day-is-it:latest"
+          Command:
+            - "/usr/bin/what-day-is-it"
+            - "-addr=0.0.0.0:8081"
+            - !Sub "-cloudformation-stack=${AWS::StackName}"
+            - !Sub "-twilio-account-sid=${TwilioAccountSID}"
+            - !Sub "-twilio-auth-token=${TwilioAuthToken}"
+            - !Sub "-twilio-phone-number=${TwilioPhoneNumber}"
+            - "serve"
+          PortMappings:
+            - ContainerPort: 8081
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref ServiceLogGroup
+              awslogs-stream-prefix: ecs
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+        
+  ServiceECSService:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ListenerHTTPS
+    Properties: 
+      ServiceName: !Sub "${AWS::StackName}-service"
+      Cluster: !Ref Cluster
+      TaskDefinition: !Ref ServiceTaskDefinition
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+      DesiredCount: 1
+      HealthCheckGracePeriodSeconds: 30
+      LaunchType: FARGATE
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          Subnets:
+            - !Ref SubnetA
+            - !Ref SubnetB
+          SecurityGroups:
+            - !Ref ContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: !Sub "${AWS::StackName}-service"
+          ContainerPort: 8081
+          TargetGroupArn: !Ref TargetGroup
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+  #
+  # Security groups
+  #
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} containers"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8081
+          ToPort: 8081
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: !Sub "${AWS::StackName} load balancers"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+  
+  #
+  # Route53
+  #
+  DNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Sub "${HostedZoneName}."
+      Name: !Sub "${AWS::StackName}.${HostedZoneName}."
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+
+Outputs:
+  Endpoint:
+    Description: Endpoint
+    Value: !Join ['', ['https://', !Ref DNSRecord]]

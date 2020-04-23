@@ -4,6 +4,7 @@
 *.sw[onp]
 *.code-workspace
 /pkg/ui/node_modules
+/.env
 
 #
 # Build assets
