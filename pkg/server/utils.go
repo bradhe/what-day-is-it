@@ -44,7 +44,7 @@ func (s *Server) timezoneOrDefault(str string) string {
 
 	// Let's try to load this timezone. If it fails we'll just use the default timezone.
 	if _, err := time.LoadLocation(str); err != nil {
-		logger.WithField("requested_timezone", str).WithField("default_timezone", s.DefaultTimeZone).Info("railed to load timezone")
+		logger.WithError(err).WithField("requested_timezone", str).WithField("default_timezone", s.DefaultTimeZone).Warn("failed to load timezone")
 		return s.DefaultTimeZone
 	} else {
 		return str
