@@ -129,7 +129,6 @@ Resources:
         - Key: Stack-Type
           Value: what-day-is-it
 
-
   #
   # CloudWatch
   #
@@ -137,6 +136,30 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub '/ecs/${AWS::StackName}/Service'
+
+  JobLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/${AWS::StackName}/Job'
+  
+  ScheduledTaskRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: 'cron(* */1 * * ? *)'
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt Cluster.Arn
+          RoleArn: !GetAtt ExecutionRole.Arn
+          Id: !Sub "${AWS::StackName}-scheduled-task-rule"
+          EcsParameters:
+            TaskDefinitionArn: !Ref JobTaskDefinition
+            LaunchType: FARGATE
+            NetworkConfiguration:
+              AwsVpcConfiguration:
+                AssignPublicIp: DISABLED
+                Subnets:
+                  - !Ref SubnetA
+                  - !Ref SubnetB
 
   #
   # EC2
@@ -263,6 +286,39 @@ Resources:
             Options:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref ServiceLogGroup
+              awslogs-stream-prefix: ecs
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Stack-Type
+          Value: what-day-is-it
+  
+  JobTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${AWS::StackName}-service"
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: 256
+      Memory: 0.5GB
+      ExecutionRoleArn: !Ref ExecutionRole
+      TaskRoleArn: !Ref TaskRole
+      ContainerDefinitions:
+        - Name: !Sub "${AWS::StackName}-job"
+          Image: "bradhe/what-day-is-it:latest"
+          Command:
+            - "/usr/bin/what-day-is-it"
+            - !Sub "-cloudformation-stack=${AWS::StackName}"
+            - !Sub "-twilio-account-sid=${TwilioAccountSID}"
+            - !Sub "-twilio-auth-token=${TwilioAuthToken}"
+            - !Sub "-twilio-phone-number=${TwilioPhoneNumber}"
+            - "deliver"
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref JobLogGroup
               awslogs-stream-prefix: ecs
       Tags:
         - Key: Environment
