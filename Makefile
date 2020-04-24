@@ -17,3 +17,6 @@ test: clean
 
 images:
 	docker build -t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) .
+
+release: images
+	docker push $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
