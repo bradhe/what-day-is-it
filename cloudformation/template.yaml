@@ -83,10 +83,13 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ecs-tasks.amazonaws.com
+              Service:
+                - ecs-tasks.amazonaws.com
+                - events.amazonaws.com
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceEventsRole'
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -101,7 +104,9 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: ecs-tasks.amazonaws.com
+              Service:
+                - ecs-tasks.amazonaws.com
+                - events.amazonaws.com
             Action: 'sts:AssumeRole'
       ManagedPolicyArns:
         - !Ref TaskPolicy
@@ -145,7 +150,7 @@ Resources:
   ScheduledTaskRule:
     Type: AWS::Events::Rule
     Properties:
-      ScheduleExpression: 'cron(* */1 * * ? *)'
+      ScheduleExpression: 'cron(0 */1 * * ? *)'
       State: ENABLED
       Targets:
         - Arn: !GetAtt Cluster.Arn
@@ -156,7 +161,7 @@ Resources:
             LaunchType: FARGATE
             NetworkConfiguration:
               AwsVpcConfiguration:
-                AssignPublicIp: DISABLED
+                AssignPublicIp: ENABLED
                 Subnets:
                   - !Ref SubnetA
                   - !Ref SubnetB
@@ -296,7 +301,7 @@ Resources:
   JobTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub "${AWS::StackName}-service"
+      Family: !Sub "${AWS::StackName}-job"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
