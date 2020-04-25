@@ -24,8 +24,9 @@ function dayNameFromDayIndex(idx) {
 var number;
 
 window.onload = () => {
-  document.getElementById('current-day-label').innerHTML = 'Today is ' + dayNameFromDayIndex(new Date().getDay());
-  
+  document.getElementById('current-day-label').innerHTML = 'Today is <span>' +
+    dayNameFromDayIndex(new Date().getDay()) + '!</span>';
+
   var numberInput = document.getElementById('number');
   number = intlTelInput(numberInput, {
       placeholderNumberType: 'MOBILE',

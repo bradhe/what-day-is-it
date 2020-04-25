@@ -1,35 +1,42 @@
 @import "intl-tel-input-16.0.11";
 
 html, body, .container {
-    font-family: Montserrat;
-    height: 100%;
-    width: 100%;
     display: flex;
-    text-align: center;
+    font-family: helvetica;
+    height: 100%;
     margin: 0;
     padding: 0;
+    text-align: center;
+    width: 100%;
 }
 
 body {
-    background-color: #391463;
+    background-color: #000;
     display: flex;
     flex-direction: column;
 }
 
 main {
-    flex-grow: 2;
+    flex-grow: 0.92;
 }
 
 footer {
-    flex-shrink: 0;
-    padding: 8px 5px;
-    font-weight: bold;
     color: #D2ADFC;
-}
-
-footer p {
-    margin: 0;
-    padding: 0;
+    flex-shrink: 0;
+    font-weight: bold;
+    padding: 8px 5px;
+    p.small {
+      font-size: 9pt;
+      color: #343434;
+      margin: 8px;
+      span {
+        color: #787878;
+      }
+    }
+    p {
+      margin: 0;
+      padding: 0;
+    }
 }
 
 footer a {
@@ -47,25 +54,43 @@ footer a:hover {
     flex-direction: column;
 }
 
+span.astrx {
+  font-size: 20pt;
+  color: #787878;
+}
+
 h1 {
-    color: #EAF8BF;
+    color: #fff;
     font-size: 48pt;
+    font-weight: 100;
+    span {
+      color: #a066bd;
+      font-weight: bold;
+      padding: 2pt;
+    }
 }
 
 h2 {
     color: #ECA400;
+    font-size: 1.72em;
+    font-weight: 100;
+    span {
+      text-decoration: underline;
+      font-style: italic;
+    }
 }
 
 .subtle {
-    color: #EAF8BF;
+    color: #898989;
+    margin: 20px;
 }
 
 input.number {
-    font-size: 16pt;
-    border: none;
-    padding: 8px;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
+    border: none;
+    font-size: 16pt;
+    padding: 8px;
 }
 
 input.number:focus {
@@ -73,9 +98,10 @@ input.number:focus {
 }
 
 .form-controls button {
-    width: 100%;
-    font-size: 18pt;
-    padding: 5px 18px;
+    border-radius: 4%;
+    font-size: 16pt;
+    padding: 2%;
+    width: 64%;
 }
 
 #current-day {
@@ -88,7 +114,7 @@ input.number:focus {
 }
 
 .form-element, .form-controls {
-    width: 500px;
+    width: 464px;
 }
 
 .form-element.timezone {

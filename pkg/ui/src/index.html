@@ -4,11 +4,8 @@
         <title>What day is today?</title>
 
         <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
-        
         <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/16.0.11/js/intlTelInput.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/16.0.11/js/utils.js"></script>
-
-        <link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
     </head>
@@ -20,23 +17,23 @@
                     <h1 id="current-day-label"></h1>
                 </div>
                 <div id="explanation">
-                    <h2>I can automatically remind you what day it is.</h2>
-                    <p class="subtle">Just give me your phone number and I'll text you every morning.</p>
+                    <h2>I can automatically remind you of what <span>day</span> it is.</h2>
+                    <p class="subtle">A text message reminder every morning<span class='astrx'>*</span></p>
                 </div>
 
                 <div id="subscribe-form">
                     <form id="subscription">
                         <div class="form-elements">
                             <div class="form-element number">
-                                <input type="tel" name="number" placeholder="Your phone number." id="number" class="number" />
+                                <input type="tel" name="number" placeholder="Enter your phone here" id="number" class="number" />
                             </div>
 
                             <div class="form-element timezone">
-                                <label for="timezone">Your timezone:</label>
+                                <label for="timezone">Timezone:</label>
                                 <select name="timezone" id="timezone" class="timezone">
                                     <option disabled selected style='display:none;'>Select a timezone.</option>
-                                
-                                    <optgroup label="US (Common)">	
+
+                                    <optgroup label="US (Common)">
                                         <option value="America/Puerto_Rico">Puerto Rico (Atlantic)</option>
                                         <option value="America/New_York">New York (Eastern)</option>
                                         <option value="America/Chicago">Chicago (Central)</option>
@@ -46,7 +43,7 @@
                                         <option value="America/Anchorage">Anchorage (Alaska)</option>
                                         <option value="Pacific/Honolulu">Honolulu (Hawaii)</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="America">
                                         <option value="America/Adak">Adak</option>
                                         <option value="America/Anchorage">Anchorage</option>
@@ -206,7 +203,7 @@
                                         <option value="America/Yakutat">Yakutat</option>
                                         <option value="America/Yellowknife">Yellowknife</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="Europe">
                                         <option value="Europe/Amsterdam">Amsterdam</option>
                                         <option value="Europe/Andorra">Andorra</option>
@@ -267,7 +264,7 @@
                                         <option value="Europe/Zaporozhye">Zaporozhye</option>
                                         <option value="Europe/Zurich">Zurich</option>
                                     </optgroup>
-                                    
+
                                     <optgroup label="Asia">
                                         <option value="Asia/Aden">Aden</option>
                                         <option value="Asia/Almaty">Almaty</option>
@@ -358,7 +355,7 @@
                                         <option value="Asia/Yekaterinburg">Yekaterinburg</option>
                                         <option value="Asia/Yerevan">Yerevan</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="Africa">
                                         <option value="Africa/Abidjan">Abidjan</option>
                                         <option value="Africa/Accra">Accra</option>
@@ -414,7 +411,7 @@
                                         <option value="Africa/Tunis">Tunis</option>
                                         <option value="Africa/Windhoek">Windhoek</option>
                                     </optgroup>
-                                    
+
                                     <optgroup label="Australia">
                                         <option value="Australia/ACT">ACT</option>
                                         <option value="Australia/Adelaide">Adelaide</option>
@@ -440,7 +437,7 @@
                                         <option value="Australia/West">West</option>
                                         <option value="Australia/Yancowinna">Yancowinna</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="Indian">
                                         <option value="Indian/Antananarivo">Antananarivo</option>
                                         <option value="Indian/Chagos">Chagos</option>
@@ -454,7 +451,7 @@
                                         <option value="Indian/Mayotte">Mayotte</option>
                                         <option value="Indian/Reunion">Reunion</option>
                                     </optgroup>
-                                    
+
                                     <optgroup label="Atlantic">
                                         <option value="Atlantic/Azores">Azores</option>
                                         <option value="Atlantic/Bermuda">Bermuda</option>
@@ -469,7 +466,7 @@
                                         <option value="Atlantic/Stanley">Stanley</option>
                                         <option value="Atlantic/St_Helena">St Helena</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="Pacific">
                                         <option value="Pacific/Apia">Apia</option>
                                         <option value="Pacific/Auckland">Auckland</option>
@@ -512,7 +509,7 @@
                                         <option value="Pacific/Wallis">Wallis</option>
                                         <option value="Pacific/Yap">Yap</option>
                                     </optgroup>
-                                    
+
                                     <optgroup label="Antarctica">
                                         <option value="Antarctica/Casey">Casey</option>
                                         <option value="Antarctica/Davis">Davis</option>
@@ -526,11 +523,11 @@
                                         <option value="Antarctica/Syowa">Syowa</option>
                                         <option value="Antarctica/Vostok">Vostok</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="Arctic">
                                         <option value="Arctic/Longyearbyen">Longyearbyen</option>
                                     </optgroup>
-                                
+
                                     <optgroup label="UTC">
                                         <option value="UTC">UTC</option>
                                     </optgroup>
@@ -569,7 +566,8 @@
                         </div>
 
                         <div class="form-controls">
-                            <button type="submit">Thank god! I can't keep track any more.</button>
+                            <button type="submit">Submit & Send Me Alerts</button>
+                            <p class="subtle">-- "Thank god, I can't keep track anymore!"</p>
                         </div>
                     </form>
                 </div>
@@ -583,13 +581,10 @@
         </main>
 
         <footer>
-            <p>Made with 💜 by <a href="https://github.com/bradhe">Brad</a> in Portland</p>
+            <p class="small"><span>*</span> Charges may be incurred depending on your phone's data plan, use at your own discretion.</p>
+            <p>Made with 💜 by <a href="https://github.com/bradhe">Brad</a> and help from <a href="https://github.com/nicksort">Nick</a> in <a href="https://en.wikipedia.org/wiki/Portland,_Oregon">Portland</a></p>
         </footer>
     </body>
-
-    <script>
-
-    </script>
-<script async src="https://www.googletagmanager.com/gtag/js?id=UA-20887375-2"></script>
-<script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'UA-20887375-2');</script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-20887375-2"></script>
+    <script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'UA-20887375-2');</script>
 </html>
