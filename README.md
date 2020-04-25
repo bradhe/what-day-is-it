@@ -14,7 +14,14 @@ There are really two projects in one here.
 * node v10.x.x
 * npm v6.x.x
 
+
 ## Golang
+
+You might need to install go-bindata.
+
+```
+brew install go-bindata
+```
 
 You can build the Golang target by using the `build` make target.
 
