@@ -16,6 +16,8 @@ import (
 var logger = logs.WithPackage("main")
 
 func doDeliveryRun(managers managers.Managers, sender *twilio.Sender) {
+	var acc int
+
 	manager := managers.PhoneNumbers()
 
 	logger.Info("starting delivery run")
@@ -50,8 +52,11 @@ func doDeliveryRun(managers managers.Managers, sender *twilio.Sender) {
 
 			// We'll finish this for the day.
 			manager.UpdateSent(&number, clock.Clock())
+			acc++
 		}
 	}
+
+	logger.Infof("run completed. delivered %d messages.", acc)
 }
 
 func doDeliveryRunLoop(managers managers.Managers, sender *twilio.Sender) {
