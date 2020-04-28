@@ -16,6 +16,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: go get -u github.com/jteeuwen/go-bindata/...
       - run: cd pkg/ui && npm install
       - run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
       - run: make release
