@@ -95,7 +95,7 @@ func deserializeAllPhoneNumbers(arr []map[string]*awsdynamodb.AttributeValue) (o
 	return out
 }
 
-func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Time) ([]models.PhoneNumber, error) {
+func (m dynamodbPhoneNumberManager) GetBySendDeadline(deadline *time.Time) ([]models.PhoneNumber, error) {
 	in := awsdynamodb.ScanInput{
 		TableName: aws.String(m.tableName()),
 		ExpressionAttributeNames: map[string]*string{
@@ -107,11 +107,10 @@ func (m dynamodbPhoneNumberManager) GetNBySendDeadline(n int, deadline *time.Tim
 			},
 		},
 		FilterExpression: aws.String("#deadline < :deadline"),
-		Limit:            aws.Int64(int64(n)),
 	}
 
 	if out, err := m.svc.Scan(&in); err != nil {
-		logger.WithError(err).Errorf("failed to scan for %d phone numbers in DynamoDB", n)
+		logger.WithError(err).Errorf("failed to scan for phone numbers in DynamoDB")
 		return nil, err
 	} else {
 		return deserializeAllPhoneNumbers(out.Items), nil

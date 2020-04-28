@@ -23,7 +23,7 @@ func doDeliveryRun(managers managers.Managers, sender *twilio.Sender) {
 	logger.Info("starting delivery run")
 
 	for {
-		numbers, err := manager.GetNBySendDeadline(10, clock.Clock())
+		numbers, err := manager.GetBySendDeadline(clock.Clock())
 
 		if err != nil {
 			logger.WithError(err).Error("failed to lookup batch for delivery")
@@ -31,6 +31,7 @@ func doDeliveryRun(managers managers.Managers, sender *twilio.Sender) {
 		}
 
 		if len(numbers) < 1 {
+			logger.Info("no more numbers found.")
 			break
 		}
 
@@ -40,19 +41,17 @@ func doDeliveryRun(managers managers.Managers, sender *twilio.Sender) {
 
 				// Update this anyway so we don't check it again for a while.
 				manager.UpdateSkipped(&number, clock.Clock())
+			} else {
+				body := fmt.Sprintf("Today is %s", clock.GetDayInZone(clock.MustLoadLocation(number.Timezone)))
 
-				continue
+				if err := sender.Send(number.Number, body); err != nil {
+					logger.WithError(err).Warn("failed to deliver message via Twilio")
+				}
+
+				// We'll finish this for the day.
+				manager.UpdateSent(&number, clock.Clock())
+				acc++
 			}
-
-			body := fmt.Sprintf("Today is %s", clock.GetDayInZone(clock.MustLoadLocation(number.Timezone)))
-
-			if err := sender.Send(number.Number, body); err != nil {
-				logger.WithError(err).Warn("failed to deliver message via Twilio")
-			}
-
-			// We'll finish this for the day.
-			manager.UpdateSent(&number, clock.Clock())
-			acc++
 		}
 	}
 

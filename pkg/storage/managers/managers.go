@@ -7,7 +7,7 @@ import (
 )
 
 type PhoneNumberManager interface {
-	GetNBySendDeadline(int, *time.Time) ([]models.PhoneNumber, error)
+	GetBySendDeadline(*time.Time) ([]models.PhoneNumber, error)
 	UpdateSent(*models.PhoneNumber, *time.Time) error
 	UpdateSkipped(*models.PhoneNumber, *time.Time) error
 	UpdateNotSendable(*models.PhoneNumber) error
