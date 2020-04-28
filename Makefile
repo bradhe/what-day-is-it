@@ -16,6 +16,7 @@ test: clean
 	go test -v ./...
 
 images:
+	go generate ./...
 	docker build -t $(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) .
 
 release: images
